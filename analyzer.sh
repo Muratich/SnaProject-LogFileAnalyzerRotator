@@ -5,10 +5,14 @@ LOG_FILES=(
   "/var/log/auth.log"
 )
 
-SUMMARY_DIR="./summary"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SUMMARY_DIR="$SCRIPT_DIR/summary"
 TIMESTAMP="$(date '+%Y-%m-%d_%H-%M-%S')"
 REPORT_FILE="$SUMMARY_DIR/summary-$TIMESTAMP.txt"
-ROTATOR_SCRIPT="./rotator.sh"
+ROTATOR_SCRIPT="$SCRIPT_DIR/rotator.sh"
+
+ERROR_LINES_TMP="$(mktemp)"
+trap 'rm -f "$ERROR_LINES_TMP"' EXIT
 
 ERROR_WORDS=(
   "error" "critical" "panic" "fail" "failed" "failure" "fatal"
@@ -55,6 +59,12 @@ classify_line() {
   fi
 }
 
+normalize_error_message() {
+  local line="$1"
+  line="${line##*: }"
+  echo "$line"
+}
+
 analyze_file() {
   local file="$1"
 
@@ -67,7 +77,10 @@ analyze_file() {
     ((total_count++))
 
     case "$(classify_line "$line")" in
-      ERROR)   ((error_count++)) ;;
+      ERROR)
+        ((error_count++))
+        normalize_error_message "$line" >> "$ERROR_LINES_TMP"
+        ;;
       WARNING) ((warning_count++)) ;;
       INFO)    ((info_count++)) ;;
     esac
@@ -119,6 +132,9 @@ overall_warning=0
 overall_info=0
 overall_total=0
 
+most_active_file=""
+most_active_count=0
+
 for log_file in "${LOG_FILES[@]}"; do
   if [[ ! -r "$log_file" ]]; then
     echo " - NOT READABLE: $log_file" >> "$REPORT_FILE"
@@ -133,6 +149,11 @@ for log_file in "${LOG_FILES[@]}"; do
   overall_warning=$((overall_warning + warning_count))
   overall_info=$((overall_info + info_count))
   overall_total=$((overall_total + total_count))
+
+  if (( total_count > most_active_count )); then
+    most_active_count=$total_count
+    most_active_file="$log_file"
+  fi
 done
 
 {
@@ -142,6 +163,35 @@ done
   echo "ERROR:   $overall_error"
   echo "WARNING: $overall_warning"
   echo "INFO:    $overall_info"
+
+  echo
+  echo "Top 5 error messages:"
+  if [[ -s "$ERROR_LINES_TMP" ]]; then
+    sort "$ERROR_LINES_TMP" | uniq -c | sort -nr | head -n 5 | awk '{
+      count=$1
+      $1=""
+      sub(/^ /, "")
+      print " - " count "x " $0
+    }'
+  else
+    echo " - none"
+  fi
+
+  echo
+  echo "Most active log file:"
+  if [[ -n "$most_active_file" ]]; then
+    echo " - $most_active_file ($most_active_count lines)"
+  else
+    echo " - none"
+  fi
+
+  echo
+  if [[ "$overall_total" -gt 0 ]]; then
+    error_rate="$(awk -v e="$overall_error" -v t="$overall_total" 'BEGIN { printf "%.2f", (e * 100) / t }')"
+  else
+    error_rate="0.00"
+  fi
+  echo "Error rate: ${error_rate}%"
 } >> "$REPORT_FILE"
 
 previous_summary="$(get_previous_summary)"
@@ -161,10 +211,10 @@ if [[ -n "$previous_summary" ]]; then
 
   {
     echo
-    echo "Comparison with previous summary:"
-    echo "ERROR:   $(printf '%+d' "$diff_error")"
-    echo "WARNING: $(printf '%+d' "$diff_warning")"
-    echo "INFO:    $(printf '%+d' "$diff_info")"
+    echo "Tendency:"
+    echo "ERROR_TENDENCY:   $(printf '%+d' "$diff_error")"
+    echo "WARNING_TENDENCY: $(printf '%+d' "$diff_warning")"
+    echo "INFO_TENDENCY:    $(printf '%+d' "$diff_info")"
     echo "Previous summary: $previous_summary"
   } >> "$REPORT_FILE"
 fi

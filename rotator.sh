@@ -4,11 +4,13 @@
 # Rotates log files that exceed a size threshold.
 # After rotation, sends SIGUSR2 to a tracked application PID (if available).
 
-# ── Configuration ────────────────────────────────────────────────────────────
+# Configuration
 
-LOG_DIR="./logs"
-ARCHIVE_DIR="./logs/archive"
-PID_FILE="./app.pid"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+LOG_DIR="$SCRIPT_DIR/logs"
+ARCHIVE_DIR="$SCRIPT_DIR/logs/archive"
+PID_FILE="$SCRIPT_DIR/app.pid"
 
 # Size threshold in bytes (default: 1 MB)
 MAX_SIZE_BYTES=$((1 * 1024 * 1024))
@@ -16,7 +18,7 @@ MAX_SIZE_BYTES=$((1 * 1024 * 1024))
 # How many rotated archives to keep per log file
 MAX_ARCHIVES=5
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# Helpers
 
 log_msg() {
   echo "[rotator] $(date '+%Y-%m-%d %H:%M:%S') $*"
@@ -27,13 +29,13 @@ file_size() {
   stat -c%s "$1" 2>/dev/null || echo 0
 }
 
-# ── Setup ─────────────────────────────────────────────────────────────────────
+# Setup
 
 mkdir -p "$ARCHIVE_DIR"
 
 rotated_any=false
 
-# ── Main rotation loop ────────────────────────────────────────────────────────
+# Main rotation loop
 
 for log_file in "$LOG_DIR"/*.log; do
   # Skip if glob found nothing
@@ -66,7 +68,7 @@ for log_file in "$LOG_DIR"/*.log; do
     continue
   fi
 
-  # ── Prune old archives (keep only MAX_ARCHIVES most recent) ─────────────────
+  # Prune old archives (keep only MAX_ARCHIVES most recent)
   mapfile -t old_archives < <(
     ls -1t "$ARCHIVE_DIR/${base}-"*.log.gz 2>/dev/null
   )
@@ -79,7 +81,7 @@ for log_file in "$LOG_DIR"/*.log; do
   fi
 done
 
-# ── Send SIGUSR2 to the application ──────────────────────────────────────────
+# Send SIGUSR2 to the application
 
 if [[ "$rotated_any" == true ]]; then
   if [[ -f "$PID_FILE" ]]; then
