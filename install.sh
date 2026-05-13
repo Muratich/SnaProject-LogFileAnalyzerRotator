@@ -39,7 +39,7 @@ bash "$PROJECT_DIR/generate_sample_log.sh" 2>/dev/null \
 
 # Register cron job (runs analyzer.sh every hour)
 
-CRON_ENTRY="* * * * * $PROJECT_DIR/analyzer.sh >> $PROJECT_DIR/logs/cron.log 2>&1"
+CRON_ENTRY="0 * * * * $PROJECT_DIR/analyzer.sh >> $PROJECT_DIR/logs/cron.log 2>&1"
 
 # Add only if not already present
 
