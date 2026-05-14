@@ -8,7 +8,7 @@ crontab -l
 
 The installer will:
 
-- make scripts executable
+- make scripts executable 
 - create required directories
 - generate a sample log file
 - register the hourly cron job

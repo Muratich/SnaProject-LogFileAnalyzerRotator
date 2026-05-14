@@ -33,9 +33,12 @@ echo "Directories created: logs/, logs/archive/, summary/"
 
 # Generate a sample log
 
-echo "Generating sample log file ..."
-bash "$PROJECT_DIR/generate_sample_log.sh" 2>/dev/null \
-  || echo "(generate_sample_log.sh not found — skipping)"
+SAMPLE_LOG="$PROJECT_DIR/logs/app.log"
+if [[ ! -f "$SAMPLE_LOG" ]]; then
+  echo "Generating sample log file at $SAMPLE_LOG …"
+  bash "$PROJECT_DIR/generate_sample_log.sh" 2>/dev/null \
+    || echo "(generate_sample_log.sh not found — skipping)"
+fi
 
 # Register cron job (runs analyzer.sh every hour)
 
